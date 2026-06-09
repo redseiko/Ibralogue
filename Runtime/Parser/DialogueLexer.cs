@@ -222,8 +222,26 @@ namespace Ibralogue.Parser
 			{
 				Advance();
 				int argStart = _position;
-				while (!IsAtEnd() && Peek() != ')' && Peek() != '\n' && Peek() != '\r')
+				int parenDepth = 1;
+
+				while (!IsAtEnd() && Peek() != '\n' && Peek() != '\r')
+				{
+					if (Peek() == '(')
+					{
+						parenDepth++;
+					}
+					else if (Peek() == ')')
+					{
+						parenDepth--;
+					}
+
+					if (parenDepth == 0)
+					{
+						break;
+					}
+
 					Advance();
+				}
 
 				argument = Substring(argStart, _position);
 
@@ -475,17 +493,33 @@ namespace Ibralogue.Parser
 
 			int nameStart = peekPos;
 			while (peekPos < _source.Length && _source[peekPos] != '(' && _source[peekPos] != '}'
-				   && _source[peekPos] != '\n' && _source[peekPos] != '\r')
+					 && _source[peekPos] != '\n' && _source[peekPos] != '\r')
 				peekPos++;
 
 			int nameEnd = peekPos;
 
 			if (peekPos < _source.Length && _source[peekPos] == '(')
 			{
-				while (peekPos < _source.Length && _source[peekPos] != ')' && _source[peekPos] != '\n')
+				int parenDepth = 0;
+
+				while (peekPos < _source.Length && _source[peekPos] != '\n')
+				{
+					if (_source[peekPos] == '(')
+					{
+						parenDepth++;
+					}
+					else if (_source[peekPos] == ')')
+					{
+						parenDepth--;
+					}
+
 					peekPos++;
-				if (peekPos < _source.Length && _source[peekPos] == ')')
-					peekPos++;
+
+					if (parenDepth == 0)
+					{
+						break;
+					}
+				}
 			}
 
 			if (peekPos + 1 < _source.Length && _source[peekPos] == '}' && _source[peekPos + 1] == '}')
