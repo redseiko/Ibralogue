@@ -648,7 +648,21 @@ namespace Ibralogue
                                 InvokeFunctionsAsync(resolved.LineContent.Invocations, resolved));
                             return;
                         }
+
+                        ContentCursor prevCursor = _cursor;
                         InvokeFunctions(resolved.LineContent.Invocations, resolved);
+
+                        if (_cursor != prevCursor)
+                        {
+                            return;
+                        }
+
+                        if (!string.IsNullOrEmpty(resolved.JumpTarget))
+                        {
+                            JumpTo(resolved.JumpTarget);
+                            return;
+                        }
+
                         continue;
                     }
 
@@ -1079,6 +1093,8 @@ namespace Ibralogue
 
             IEnumerable<CachedInvocation> dialogueMethods = GetInvocationMethods();
 
+            ContentCursor prevCursor = _cursor;
+
             foreach (Invocation function in functionInvocations)
             {
                 CachedInvocation? cached = ResolveInvocation(dialogueMethods, function);
@@ -1102,7 +1118,17 @@ namespace Ibralogue
                 }
             }
 
-            AdvanceAndDisplay();
+            if (_cursor == prevCursor)
+            {
+                if (!string.IsNullOrEmpty(line.JumpTarget))
+                {
+                    JumpTo(line.JumpTarget);
+                }
+                else
+                {
+                    AdvanceAndDisplay();
+                }
+            }
         }
 
         /// <summary>
