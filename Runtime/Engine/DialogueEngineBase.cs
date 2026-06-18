@@ -348,61 +348,14 @@ namespace Ibralogue
 
         private void SkipDisplayableNodes(int count)
         {
-            Parser.Expressions.ExpressionEvaluator evaluator = CreateEvaluator();
             int skipped = 0;
-
             while (skipped < count)
             {
-                RuntimeContentNode node = _cursor.Current;
+                RuntimeContentNode node = AdvanceToNextDisplayable();
                 if (node == null) break;
 
-                if (node is RuntimeLine || node is RuntimeChoicePoint)
-                {
-                    skipped++;
-                    _displayedNodeCount++;
-                    _cursor.Advance();
-                    continue;
-                }
-
-                if (node is RuntimeSetCommand set)
-                {
-                    object value = evaluator.Evaluate(set.Value);
-                    VariableStore.Set(_currentAssetName, set.VariableName, value);
-                    _cursor.Advance();
-                    continue;
-                }
-
-                if (node is RuntimeGlobalDecl global)
-                {
-                    if (global.DefaultValue != null)
-                    {
-                        object value = evaluator.Evaluate(global.DefaultValue);
-                        VariableStore.SetGlobal(global.VariableName, value);
-                    }
-                    else if (!VariableStore.IsDefined(_currentAssetName, global.VariableName))
-                    {
-                        VariableStore.SetGlobal(global.VariableName, null);
-                    }
-                    _cursor.Advance();
-                    continue;
-                }
-
-                if (node is RuntimeConditionalBlock conditional)
-                {
-                    _cursor.Advance();
-                    foreach (RuntimeBranch branch in conditional.Branches)
-                    {
-                        if (branch.Condition == null ||
-                            evaluator.EvaluateTruthy(branch.Condition))
-                        {
-                            _cursor.PushScope(branch.Body);
-                            break;
-                        }
-                    }
-                    continue;
-                }
-
-                _cursor.Advance();
+                skipped++;
+                _displayedNodeCount++;
             }
         }
 
@@ -558,23 +511,36 @@ namespace Ibralogue
         private RuntimeContentNode AdvanceToNextDisplayable()
         {
             Parser.Expressions.ExpressionEvaluator evaluator = CreateEvaluator();
+            RuntimeChoicePoint accumulatedChoices = null;
 
             while (true)
             {
                 RuntimeContentNode node = _cursor.Current;
                 if (node == null)
-                    return null;
+                    return accumulatedChoices;
 
                 if (node is RuntimeLine line)
                 {
+                    if (accumulatedChoices != null)
+                        return accumulatedChoices;
+
                     _cursor.Advance();
                     return line;
                 }
 
                 if (node is RuntimeChoicePoint choices)
                 {
+                    if (accumulatedChoices == null)
+                    {
+                        accumulatedChoices = new RuntimeChoicePoint(new List<ChoiceData>(choices.Choices));
+                    }
+                    else
+                    {
+                        accumulatedChoices.Choices.AddRange(choices.Choices);
+                    }
+
                     _cursor.Advance();
-                    return choices;
+                    continue;
                 }
 
                 if (node is RuntimeSetCommand set)
@@ -700,15 +666,36 @@ namespace Ibralogue
         {
             ContentCursor peekCursor = _cursor.Clone();
             Parser.Expressions.ExpressionEvaluator evaluator = CreateEvaluator();
+            RuntimeChoicePoint accumulatedChoices = null;
 
             while (true)
             {
                 RuntimeContentNode node = peekCursor.Current;
                 if (node == null)
-                    return null;
+                    return accumulatedChoices;
 
-                if (node is RuntimeLine || node is RuntimeChoicePoint)
-                    return node;
+                if (node is RuntimeLine line)
+                {
+                    if (accumulatedChoices != null)
+                        return accumulatedChoices;
+                        
+                    return line;
+                }
+
+                if (node is RuntimeChoicePoint choices)
+                {
+                    if (accumulatedChoices == null)
+                    {
+                        accumulatedChoices = new RuntimeChoicePoint(new List<ChoiceData>(choices.Choices));
+                    }
+                    else
+                    {
+                        accumulatedChoices.Choices.AddRange(choices.Choices);
+                    }
+
+                    peekCursor.Advance();
+                    continue;
+                }
 
                 if (node is RuntimeSetCommand || node is RuntimeGlobalDecl)
                 {
