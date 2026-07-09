@@ -1029,8 +1029,19 @@ namespace Ibralogue
         private void InvokeTextProducingFunctions(List<ResolvedInvocation> resolved, Line line)
         {
             LineContent content = line.LineContent;
-            foreach (ResolvedInvocation r in resolved)
+            int offsetShift = 0;
+
+            for (int i = 0; i < resolved.Count; i++)
             {
+                ResolvedInvocation r = resolved[i];
+                if (offsetShift > 0)
+                {
+                    Invocation oldInv = r.Invocation;
+                    Invocation newInv = new Invocation(oldInv.Name, oldInv.Arguments, oldInv.CharacterIndex + offsetShift, oldInv.Line, oldInv.Column);
+                    r.Invocation = newInv;
+                    resolved[i] = r;
+                }
+
                 if (r.Method.ReturnType == typeof(void)
                     || typeof(IEnumerator).IsAssignableFrom(r.Method.ReturnType))
                     continue;
@@ -1038,6 +1049,8 @@ namespace Ibralogue
                 object result = r.Method.Invoke(r.Target, r.Arguments);
                 string insertText = Convert.ToString(result, CultureInfo.InvariantCulture) ?? "";
                 content.Text = content.Text.Insert(r.Invocation.CharacterIndex, insertText);
+
+                offsetShift += insertText.Length;
             }
             line.LineContent = content;
         }
@@ -1082,12 +1095,20 @@ namespace Ibralogue
 
             ContentCursor prevCursor = _cursor;
 
+            int offsetShift = 0;
+
             foreach (Invocation function in functionInvocations)
             {
-                CachedInvocation? cached = ResolveInvocation(dialogueMethods, function);
+                Invocation shiftedFunction = function;
+                if (offsetShift > 0)
+                {
+                    shiftedFunction = new Invocation(function.Name, function.Arguments, function.CharacterIndex + offsetShift, function.Line, function.Column);
+                }
+
+                CachedInvocation? cached = ResolveInvocation(dialogueMethods, shiftedFunction);
                 if (cached == null) continue;
 
-                object[] args = BuildInvocationArguments(cached.Value.Method, function);
+                object[] args = BuildInvocationArguments(cached.Value.Method, shiftedFunction);
                 if (args == null) continue;
 
                 object result = cached.Value.Method.Invoke(cached.Value.Target, args);
@@ -1100,8 +1121,10 @@ namespace Ibralogue
                 {
                     string insertText = Convert.ToString(result, CultureInfo.InvariantCulture) ?? "";
                     LineContent content = line.LineContent;
-                    content.Text = content.Text.Insert(function.CharacterIndex, insertText);
+                    content.Text = content.Text.Insert(shiftedFunction.CharacterIndex, insertText);
                     line.LineContent = content;
+
+                    offsetShift += insertText.Length;
                 }
             }
 
