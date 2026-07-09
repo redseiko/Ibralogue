@@ -42,13 +42,45 @@ namespace Ibralogue.Parser
 			if (string.IsNullOrEmpty(rawArgs) || rawArgs.Trim().Length == 0)
 				return result;
 
-			string[] parts = rawArgs.Split(',');
-			foreach (string part in parts)
+			bool inDoubleQuotes = false;
+			bool inSingleQuotes = false;
+			bool isEscaped = false;
+			int parenDepth = 0;
+			int startIndex = 0;
+
+			for (int i = 0; i < rawArgs.Length; i++)
 			{
-				string trimmed = part.Trim();
-				if (trimmed.Length > 0)
-					result.Add(trimmed);
+				char c = rawArgs[i];
+
+				if (c == '"' && !inSingleQuotes && !isEscaped)
+					inDoubleQuotes = !inDoubleQuotes;
+				else if (c == '\'' && !inDoubleQuotes && !isEscaped)
+					inSingleQuotes = !inSingleQuotes;
+				else if (c == '(' && !inDoubleQuotes && !inSingleQuotes)
+					parenDepth++;
+				else if (c == ')' && !inDoubleQuotes && !inSingleQuotes)
+					parenDepth--;
+				else if (c == ',' && !inDoubleQuotes && !inSingleQuotes && parenDepth == 0)
+				{
+					string part = rawArgs.Substring(startIndex, i - startIndex).Trim();
+					if (part.Length > 0)
+						result.Add(StripQuotes(part));
+					startIndex = i + 1;
+				}
+
+				if (c == '\\')
+					isEscaped = !isEscaped;
+				else
+					isEscaped = false;
 			}
+
+			if (startIndex < rawArgs.Length)
+			{
+				string part = rawArgs.Substring(startIndex).Trim();
+				if (part.Length > 0)
+					result.Add(StripQuotes(part));
+			}
+
 			return result;
 		}
 
